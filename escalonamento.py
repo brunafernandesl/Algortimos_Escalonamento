@@ -162,7 +162,7 @@ class Escalonador:
             if tempo_atual < p.tempo_chegada:
                 tempo_atual = p.tempo_chegada
             
-            print(f"Tempo {tempo_atual}: Executando P{p.pid}")
+            print(f"Tempo {tempo_atual}: Executando P{p.pid} (Duração: {p.tempo_total})")
             tempo_atual += p.tempo_total
             self.finalizar_processo(p, tempo_atual, finalizados)
 
@@ -187,6 +187,9 @@ class Escalonador:
                 continue
             
             escolhido = min(disponiveis, key=lambda x: x.tempo_total)
+            
+            print(f"Tempo {tempo_atual}: Executando P{escolhido.pid} (Surto: {escolhido.tempo_total})")
+            
             tempo_atual += escolhido.tempo_total
             escolhido.concluido = True
             
@@ -214,6 +217,9 @@ class Escalonador:
                 continue
             
             escolhido = min(disponiveis, key=lambda x: x.tempo_restante)
+            
+            print(f"Tempo {tempo_atual}: Executando P{escolhido.pid} (Restante: {escolhido.tempo_restante})")
+            
             escolhido.tempo_restante -= 1
             tempo_atual += 1
             
@@ -226,28 +232,52 @@ class Escalonador:
 
     # ================= EDF =================
 
+
     def real_time(self):
         fila = []
         processos_finalizados = []
         pid = 1
         tempo_atual = 0
 
-        print("\n--- Configuração EDF ---")
+        print("\n--- Configuração EDF (Earliest Deadline First) ---")
         try:
-            n = int(input("Quantos processos deseja inserir? "))
+            n = int(input("Quantos processos iniciais deseja inserir? "))
 
             for i in range(n):
                 tempo = int(input(f"Tempo de execução do processo {pid}: "))
-                prazo = int(input(f"Prazo (deadline) do processo {pid}: "))
+                prazo = int(input(f"Prazo (deadline) do processo {pid} (a partir de agora): "))
                 fila.append(Processo(pid, tempo, tempo_atual, deadline=(tempo_atual + prazo)))
                 pid += 1
 
-            print("\n--- Iniciando EDF ---\n")
+            print("\n--- Iniciando Tempo Real (EDF) ---\n")
 
             while len(fila) > 0:
+                
                 fila.sort(key=lambda x: x.deadline)
 
+                print(f"\n[Tempo {tempo_atual}] Fila (Ordenada por Prazo): {[(p.pid, p.deadline) for p in fila]}")
+                
+                
+                opcao = input("Pressione ENTER para continuar ou 'i' para inserir novo processo urgente: ").lower()
+                
+                if opcao == 'i':
+                    try:
+                        t = int(input(f"Tempo de execução do novo processo {pid}: "))
+                        p = int(input(f"Prazo (deadline) do processo {pid} (a partir de agora): "))
+                        fila.append(Processo(pid, t, tempo_atual, deadline=(tempo_atual + p)))
+                        print(f"+++ Processo {pid} urgente inserido no tempo {tempo_atual} +++")
+                        pid += 1
+                        
+                        fila.sort(key=lambda x: x.deadline)
+                    except ValueError:
+                        print("Erro: Digite apenas números inteiros. Processo não inserido.")
+                # -------------------------------------------------------------
+
                 processo = fila.pop(0)
+                
+               
+                print(f"Executando Processo {processo.pid} (Deadline: {processo.deadline})")
+                
                 processo.tempo_restante -= 1
                 tempo_atual += 1
 
@@ -255,13 +285,18 @@ class Escalonador:
                     fila.append(processo)
                 else:
                     self.finalizar_processo(processo, tempo_atual, processos_finalizados)
+                    
+                    # Verifica se estourou o prazo
+                    if tempo_atual <= processo.deadline:
+                        print(f"Status: SUCESSO (Concluído antes do prazo).")
+                    else:
+                        print(f"Status: FALHA DE PRAZO (Atraso de {tempo_atual - processo.deadline}s).")
 
             self.mostrar_estatisticas(processos_finalizados)
 
         except ValueError:
             print("Erro: Digite apenas números inteiros.")
-
-    # ================= AUXILIARES =================
+            
 
     def finalizar_processo(self, processo, tempo_atual, lista_finalizados):
         processo.tempo_conclusao = tempo_atual
