@@ -9,16 +9,15 @@ class Processo:
         self.turnaround = 0
         self.waiting = 0
         self.atraso = 0 
-        
         self.concluido = False 
 
-   
     def reset(self):
         self.tempo_restante = self.tempo_total
         self.tempo_conclusao = 0
         self.turnaround = 0
         self.waiting = 0
         self.concluido = False
+
 
 class Escalonador:
 
@@ -35,7 +34,7 @@ class Escalonador:
             if opcao == "1":
                 self.round_robin()
             elif opcao == "2":
-                self.menu_lote() # Chamada para a sua parte
+                self.menu_lote()
             elif opcao == "3":
                 self.real_time()
             elif opcao == "0":
@@ -44,7 +43,8 @@ class Escalonador:
             else:
                 print("Opção inválida!")
 
-    # --- 1. ROUND ROBIN ---
+    # ================= ROUND ROBIN =================
+
     def round_robin(self):
         fila = []
         processos_finalizados = []
@@ -57,13 +57,19 @@ class Escalonador:
 
             for i in range(n):
                 tempo = int(input(f"Tempo de execução do processo {pid}: "))
-                fila.append(Processo(pid, tempo, tempo_atual, deadline=0))
+                fila.append(Processo(pid, tempo, tempo_atual))
                 pid += 1
 
             print("\n--- Iniciando Round Robin ---\n")
 
             while len(fila) > 0:
+
                 print(f"\n[Tempo {tempo_atual}] Fila: {[p.pid for p in fila]}")
+                
+                opcao = input("Pressione ENTER para continuar ou 'i' para inserir novo processo: ").lower()
+
+                if opcao == 'i':
+                    pid = self.inserir_novo_processo(fila, pid, tempo_atual)
 
                 processo = fila.pop(0)
                 print(f"Executando Processo {processo.pid}")
@@ -80,18 +86,23 @@ class Escalonador:
                 else:
                     self.finalizar_processo(processo, tempo_atual, processos_finalizados)
 
-                
-                pass 
-
             self.mostrar_estatisticas(processos_finalizados)
+
         except ValueError:
             print("Erro: Digite apenas números inteiros.")
 
-    # =================================================================
-    #            Parte do Misericodia (SISTEMAS EM LOTE)
-    # =================================================================
-    
-    # --- 2. SISTEMAS EM LOTE ---
+    def inserir_novo_processo(self, fila, pid, tempo_atual, tipo="RR"):
+        try:
+            tempo = int(input(f"Tempo de execução do novo processo {pid}: "))
+            novo = Processo(pid, tempo, tempo_atual)
+            fila.append(novo)
+            print(f"+++ Processo {pid} inserido no tempo {tempo_atual} +++")
+            return pid + 1
+        except ValueError:
+            print("Erro: Digite apenas números inteiros.")
+            return pid
+
+    # ================= SISTEMAS EM LOTE =================
 
     def menu_lote(self):
         processos = []
@@ -133,8 +144,7 @@ class Escalonador:
                 print(f"\nConfigurando Processo P{i}:")
                 chegada = int(input("Tempo de Chegada: "))
                 surto = int(input("Tempo de Execução (Burst): "))
-                
-                lista.append(Processo(i, surto, chegada, deadline=0))
+                lista.append(Processo(i, surto, chegada))
         except ValueError:
             print("Erro: Digite apenas números inteiros.")
         return lista
@@ -152,9 +162,8 @@ class Escalonador:
             if tempo_atual < p.tempo_chegada:
                 tempo_atual = p.tempo_chegada
             
-            print(f"Tempo {tempo_atual}: Executando P{p.pid} (Duração: {p.tempo_total})")
+            print(f"Tempo {tempo_atual}: Executando P{p.pid}")
             tempo_atual += p.tempo_total
-            
             self.finalizar_processo(p, tempo_atual, finalizados)
 
         self.mostrar_estatisticas(finalizados)
@@ -178,8 +187,6 @@ class Escalonador:
                 continue
             
             escolhido = min(disponiveis, key=lambda x: x.tempo_total)
-            print(f"Tempo {tempo_atual}: Executando P{escolhido.pid} (Surto: {escolhido.tempo_total})")
-            
             tempo_atual += escolhido.tempo_total
             escolhido.concluido = True
             
@@ -207,7 +214,6 @@ class Escalonador:
                 continue
             
             escolhido = min(disponiveis, key=lambda x: x.tempo_restante)
-            
             escolhido.tempo_restante -= 1
             tempo_atual += 1
             
@@ -218,34 +224,30 @@ class Escalonador:
         
         self.mostrar_estatisticas(finalizados)
 
-    # --- 3. TEMPO REAL (EDF) ---
+    # ================= EDF =================
+
     def real_time(self):
         fila = []
         processos_finalizados = []
         pid = 1
         tempo_atual = 0
 
-        print("\n--- Configuração EDF (Earliest Deadline First) ---")
+        print("\n--- Configuração EDF ---")
         try:
-            n = int(input("Quantos processos iniciais deseja inserir? "))
+            n = int(input("Quantos processos deseja inserir? "))
 
             for i in range(n):
                 tempo = int(input(f"Tempo de execução do processo {pid}: "))
-                prazo = int(input(f"Prazo (deadline) do processo {pid} (a partir de agora): "))
+                prazo = int(input(f"Prazo (deadline) do processo {pid}: "))
                 fila.append(Processo(pid, tempo, tempo_atual, deadline=(tempo_atual + prazo)))
                 pid += 1
 
-            print("\n--- Iniciando Tempo Real (EDF) ---\n")
+            print("\n--- Iniciando EDF ---\n")
 
             while len(fila) > 0:
                 fila.sort(key=lambda x: x.deadline)
 
-                print(f"\n[Tempo {tempo_atual}] Fila (Ordenada por Prazo): {[(p.pid, p.deadline) for p in fila]}")
-
                 processo = fila.pop(0)
-
-                print(f"Executando Processo {processo.pid} (Deadline: {processo.deadline})")
-                
                 processo.tempo_restante -= 1
                 tempo_atual += 1
 
@@ -253,19 +255,14 @@ class Escalonador:
                     fila.append(processo)
                 else:
                     self.finalizar_processo(processo, tempo_atual, processos_finalizados)
-                    
-                    if tempo_atual <= processo.deadline:
-                        print(f"Status: SUCESSO (Concluído antes do prazo).")
-                    else:
-                        print(f"Status: FALHA DE PRAZO (Atraso de {tempo_atual - processo.deadline}s).")
-                
+
             self.mostrar_estatisticas(processos_finalizados)
 
         except ValueError:
             print("Erro: Digite apenas números inteiros.")
 
-    # --- MÉTODOS AUXILIARES ---
-    
+    # ================= AUXILIARES =================
+
     def finalizar_processo(self, processo, tempo_atual, lista_finalizados):
         processo.tempo_conclusao = tempo_atual
         processo.turnaround = processo.tempo_conclusao - processo.tempo_chegada
@@ -274,16 +271,12 @@ class Escalonador:
         if processo not in lista_finalizados:
             lista_finalizados.append(processo)
 
-    def inserir_novo_processo(self, fila, pid, tempo_atual, tipo="RR"):
-        pass 
-
     def mostrar_estatisticas(self, processos):
         print("\n====== RESULTADO FINAL ======")
         if not processos:
             print("Nenhum processo executado.")
             return
 
-        # Ordena por PID para facilitar leitura
         processos.sort(key=lambda x: x.pid) 
         
         soma_turnaround = 0
@@ -295,17 +288,15 @@ class Escalonador:
 
             print(f"\nProcesso {p.pid}")
             print(f"Tempo Total: {p.tempo_total}")
-            print(f"Conclusão: {p.tempo_conclusao} | Deadline: {p.deadline if p.deadline > 0 else 'N/A'}")
+            print(f"Conclusão: {p.tempo_conclusao}")
             print(f"Turnaround: {p.turnaround}")
             print(f"Waiting Time: {p.waiting}")
 
-        media_turnaround = soma_turnaround / len(processos)
-        media_waiting = soma_waiting / len(processos)
-
         print("\n--- MÉDIAS ---")
-        print(f"Média Turnaround: {media_turnaround:.2f}")
-        print(f"Média Waiting Time: {media_waiting:.2f}")
+        print(f"Média Turnaround: {soma_turnaround / len(processos):.2f}")
+        print(f"Média Waiting Time: {soma_waiting / len(processos):.2f}")
         print("\nTodos os processos foram finalizados!\n")
+
 
 if __name__ == "__main__":
     escalonador = Escalonador()
